@@ -3,11 +3,11 @@ title: "Assignment 6 - Split-plot randomization"
 author: "Aytan Pirverdiyeva"  
 format:
   html:
-    code-fold: false
+    code-fold: true
     embed-resources: true
     toc: true
-    number-sections: false
-    theme: cerulean
+    number-sections: true
+    theme: journal---
 ---
 
 # Introduction  
@@ -144,6 +144,18 @@ ggsave("../output/spp_rcbd_layoutmap.png",
        width = 6,
        height = 5,
        bg = "white")
+```
+
+
+```{r results_only, echo=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE)
+
+
+
+```
+
+
 ```
 
 # Submitting your work  
