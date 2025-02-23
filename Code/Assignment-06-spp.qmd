@@ -3,11 +3,11 @@ title: "Assignment 6 - Split-plot randomization"
 author: "Aytan Pirverdiyeva"  
 format:
   html:
-    code-fold: true
+    code-fold: true 
     embed-resources: true
     toc: true
     number-sections: true
-    theme: journal---
+    theme: cerulean
 ---
 
 # Introduction  
@@ -17,6 +17,8 @@ For that, you will first need to watch (and code along with) the following split
 
 - split-plot randomization: https://youtu.be/rXTp3Vw_770?si=MajBK1aZ221orfpa&t=3401 (starts at 00:56:41, watch till end, about 50-min total)
 
+- The partial script for the video above is in our GitHub repository, 04-classcode, **02-13_spp_randomization_partial.qmd**.
+
 
 **AFTER watching the video and developing the code in class**, then start working on this HW assignment.  
 
@@ -25,118 +27,151 @@ The different sections representing what we did in class were left in the script
 # Instructions  
   - Move this script into the `code` subfolder of your `05_spp` project folder  
   - On this script, fill your name under the `title` section of the YAML  
+  
+# Goal of this assignment  
+The goal is this assignment is for you to **design a split-plot RCBD design applicable to your area of study**.  
 
-# a) Setup  
+This could be from your own experience, an example from the literature, or something you come up entirely on your own (as long as it makes sense).  
+
+In the headings below, you will answer a couple of questions related to study objectives and treatment design, and then move on to randomize your study, create a plot layout, and export the designed table to file.  
+
+# Setup  
 Here is where we load the packages we will use.  
 Make sure to load each package in the chunk below.  
 ```{r setup, warning=FALSE, message=FALSE}
 library(tidyverse)
-
+library(dplyr)
 ```
 
+# Treatment design
+## Objectives  
+Keeping with the same motivational example we've been using, our treatment design is:  
 
+-   2-way factorial **in a split-plot**  
+-   **Whole-plot** treatment factor: P fertilizer rates: 0, 40, 80 kg K/ha\
+-   **Split-plot** treatment factor: N fertilizer rates: 0, 100, 200 kg N/ha\
+-   3 x 3 = **9 treatment combinations** that will be assigned to different sizes of experimental units!  
 
-# b) Treatment design
--2 - way factorial **in a split-plot**
-- **Whole-plot** treatment factor: K fertilizer rates: 0, 30, 60 kgK/ha\
-- **Split-plot**treatment factor: N fertilizer rates: 0, 100, 200 kgN/ha\
-- 3 x 3 = **9 treatment combinations** that will be assigned to different sizes of experimental units!
-
-# Split-plot in RCBD
+# Split-plot in RCBD  
 ## WP randomization
-```{r wp rcbd rand}
-#Setting seed to get same randomization result every time
+# Set seed for reproducibility
+```{r}
 set.seed(930)
 
-wp_rcbd_rand <-crossing(krate_kgha = c(0,30,60),
-                        block = 1:4
+```
+## Treatment design explanation  
+Here is where you explain your treatment design, including the name of the treatment factors, their levels (don't forget to include units), and which is the whole-plot treatment factor and which one is the split-plot treatment factor. 
+#Explanation of my treatment design
+- First objective: To determine the effect of varying Phosphorus (P) fertilizer rates on crop yield and root development. The study will assess how different levels of phosphorus application influence the physiological growth parameters and overall productivity of the crop.
+- Second objective: To evaluate the interaction between Phosphorus (P) rates and other nutrient factors in subsequent phases of the experiment.
+
+## Code  
+Here develop the code to setup your design (like in class).   
+```{r}
+wp_rcbd_rand <-crossing(prate_kgha = c(0, 40, 80),
+                        block = 1:3
                         ) %>%
-#Randomizing WP treatment factor to blocks(restricted)
-  arrange(block)%>%
-  group_by(block)%>%
-  mutate(krate_kgha = sample(krate_kgha))%>%
-#Creating WP plot numbers
-  mutate(wplot = (block*100)+1:3)%>%
+arrange(block)%>%
+  
+  # Randomizing WP treatment factor to blocks (restricted) 
+group_by(block)%>%
+  mutate(prate_kgha = sample(prate_kgha))%>%
+    # Creating WP plot numbers 
+mutate(wplot = (block*100)+1:3)%>%
   ungroup()
+
 wp_rcbd_rand
 ```
 
-## SP randomization
+## SP randomization  
 ```{r}
-spp_rcbd_rand <-crossing(nrate_kgha = c(0, 100, 200),
-                        wplot = wp_rcbd_rand$wplot
-                        )%>%
-  arrange(wplot)%>%
-#Randomizing SP treatment factor to WP plots(restricted)
-group_by(wplot)%>%
-mutate(nrate_kgha = sample(nrate_kgha))%>%
+library(dplyr)
 
+# Assuming wp_rcbd_rand exists and has been created correctly
+# Here is the corrected script for randomizing N rates within each W plot
 
-#Creating SP plot numbers
-mutate(splot = paste0(wplot, "-", 1:3))%>%
-ungroup()
-  
-spp_rcbd_rand
+sp_rcbd_rand <- crossing(nrate_kgha = c(0, 100, 200),
+                         wplot = wp_rcbd_rand$wplot
+                        ) %>%
+  arrange(wplot) %>%
+  group_by(wplot) %>%
+  mutate(nrate_kgha = sample(nrate_kgha)) %>%
+  # Creating SP plot numbers after ensuring all manipulations are completed within the group
+  mutate(splot = paste0(wplot, "-", row_number())) %>%
+  ungroup()  # Ungroup to finalize the data manipulation
 
+# View the resulting dataframe
+print(sp_rcbd_rand)
 ```
-
+ 
 ## Joining WP and SP into one object
 ```{r}
-spp_rcbd_rand <- wp_rcbd_rand%>%
-right_join(spp_rcbd_rand)%>%
-mutate(trtname = paste0(krate_kgha, "+", nrate_kgha))
+# Ensure wp_rcbd_rand is the data frame containing the whole plot info with 'wplot' and other identifiers
+spp_rcbd_rand <- wp_rcbd_rand %>%
+  right_join(sp_rcbd_rand, by = c("wplot"))%>%
+  # Joining on 'wplot' if this is the common identifier
+  mutate(trtname = paste0(prate_kgha, "+", nrate_kgha))
+
+# Print the combined data frame to check the join
+print(spp_rcbd_rand)
 
 
-spp_rcbd_rand
+```
+```{r}
+spp_rcbd_rand%>%
+  filter(block == 1)
 
 ```
 
 ## Plot layout
-```{r spp rcbd layout}
-spp_rcbd_layout <- spp_rcbd_rand
-#Defining numbers of rows and columns in the field for plotting purposes
+```{r}
 spp_rcbd_layout <- spp_rcbd_rand %>%
-  mutate(row = rep(1:4, each = 9))%>%   
-mutate(col = rep(seq(from = 1,
-                     to = 9, 
-                     by = 1),
-                 times = 4)
-       )  
-
+  # Defining number of rows and columns in the field for plotting purposes
+  mutate(row = rep(1:3, each = 9)) %>%
+  mutate(col = rep(seq(from = 1, 
+                       to = 9, #total number of treatments, 
+                       by = 1), 
+                   times = 3 #total number of blocks
+  )) %>%
+  # Creating plot and trtname labels for plotting
+  mutate(lab = paste0(splot, "\n", trtname))
 
 spp_rcbd_layout
-
 ```
-```{r spp rcbd map}
-ggplot(data = spp_rcbd_layout, aes (x = row,
-                                    y = -col)) +  
-geom_tile(aes(fill = factor(nrate_kgha)), 
-            color = "black",
-            show.legend = F
-            )+
-geom_tile(aes(color = krate_kgha),
-            show.legend = F,
-            size  = 2,
-            linetype = 2,
-            fill = NA) +
-  scale_fill_manual(values = c("#e5f0db",
-                               "#b1d095",
-                               "#5e813f")) +
-  geom_text(aes(label = splot), fontface = "bold", vjust =-.8)+
-  geom_text(aes(label = trtname), vjust = 1)+
-  labs(title = "Split-plot RCBD randomization of a\n3 K (whole-plot) x 3 N(split-plot) treatment design") + 
-  theme_void()
- 
 
-
-```
 # Exporting to file
 ```{r}
+ggplot(data = spp_rcbd_layout, aes(x = row, 
+                                   y = -col))+
+  geom_tile(aes(fill = factor(nrate_kgha)),
+            color= "black",
+            show.legend = F
+            )+
+  geom_tile(aes(color = prate_kgha),
+            show.legend = F,
+            size = 2,
+            linetype = 2,
+            fill = NA)+
+
+  
+  scale_fill_manual(values = c("#e5f0db",
+                              "#b1d095",
+                              "#5e813f"))+
+
+  geom_text(aes(label = splot), fontface = "bold", vjust = -.8)+
+  geom_text(aes(label = trtname), vjust = 1)+
+  labs(title = "Split-plot RCBD randomization of a\n3 P (whole-plot) x 3 N (split-plot) treatment design") +
+  theme_void()
+```
+```{r}
 spp_rcbd_rand %>%
-  dplyr::select(block, wplot, krate_kgha,
-                splot, nrate_kgha, trtname) %>%
+  # Rearranging columns  
+  dplyr::select(block, wplot, prate_kgha, 
+                splot, nrate_kgha,
+                trtname) %>%
   write_csv("../output/spp_rcbd_randomization_table.csv")
 ```
+
 
 
 ```{r}
@@ -144,18 +179,6 @@ ggsave("../output/spp_rcbd_layoutmap.png",
        width = 6,
        height = 5,
        bg = "white")
-```
-
-
-```{r results_only, echo=FALSE}
-
-knitr::opts_chunk$set(echo = FALSE)
-
-
-
-```
-
-
 ```
 
 # Submitting your work  
